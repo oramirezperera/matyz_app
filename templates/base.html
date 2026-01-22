@@ -1,0 +1,141 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Matyz Stock{% endblock %}</title>
+
+  <!-- Tailwind (CDN for v1 speed; later we can compile locally if you want) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Brand theme via CSS variables -->
+  <style>
+    :root{
+      --matyz-ink: #23201f;   /* near-black */
+      --matyz-steel: #646b70; /* steel gray */
+      --matyz-cream: #e2d9bd; /* cream */
+      --matyz-warm: #9f9383;  /* warm gray */
+    }
+    /* Subtle "metal" feel: sharp edges + high contrast */
+    .matyz-bg { background: var(--matyz-ink); color: var(--matyz-cream); }
+    .matyz-surface { background: rgba(255,255,255,0.04); border: 1px solid rgba(226,217,189,0.15); }
+    .matyz-border { border-color: rgba(226,217,189,0.18); }
+    .matyz-muted { color: rgba(226,217,189,0.72); }
+    .matyz-accent { color: var(--matyz-steel); }
+    .matyz-btn {
+      background: rgba(226,217,189,0.10);
+      border: 1px solid rgba(226,217,189,0.25);
+    }
+    .matyz-btn:hover { background: rgba(226,217,189,0.16); }
+
+    /* HTMX loading indicator */
+    .htmx-indicator { opacity: 0; transition: opacity 150ms ease-in-out; }
+    .htmx-request .htmx-indicator { opacity: 1; }
+  </style>
+
+  {% block head %}{% endblock %}
+</head>
+
+<body class="matyz-bg min-h-screen">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-40 border-b matyz-border backdrop-blur"
+          style="background: rgba(35,32,31,0.92);">
+    <div class="mx-auto max-w-6xl px-4">
+      <div class="flex h-14 items-center justify-between gap-3">
+
+        <!-- Brand / Home -->
+        <a href="{% url 'dashboard' %}" class="flex items-center gap-2">
+          <div class="h-8 w-8 rounded-sm matyz-surface flex items-center justify-center"
+               title="Matyz Tattoo">
+            <span class="text-sm font-bold matyz-accent">M</span>
+          </div>
+          <div class="leading-tight">
+            <div class="text-sm font-semibold tracking-wide">Matyz Stock</div>
+            <div class="text-xs matyz-muted">Tattoo Supply Inventory</div>
+          </div>
+        </a>
+
+        <!-- Desktop Nav -->
+        <nav class="hidden md:flex items-center gap-1">
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm" href="{% url 'dashboard' %}">Dashboard</a>
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm" href="{% url 'sales:list' %}">Sales</a>
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm" href="{% url 'inventory:items' %}">Inventory</a>
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm" href="{% url 'customers:list' %}">Customers</a>
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm" href="{% url 'inventory:low_stock' %}">Low Stock</a>
+        </nav>
+
+        <!-- Mobile menu button -->
+        <button
+          class="md:hidden px-3 py-2 rounded-sm matyz-btn text-sm"
+          type="button"
+          aria-controls="mobileNav"
+          aria-expanded="false"
+          onclick="document.getElementById('mobileNav').classList.toggle('hidden')"
+        >
+          Menu
+        </button>
+
+      </div>
+
+      <!-- Mobile Nav -->
+      <nav id="mobileNav" class="md:hidden hidden pb-3">
+        <div class="grid grid-cols-2 gap-2">
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm text-center" href="{% url 'dashboard' %}">Dashboard</a>
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm text-center" href="{% url 'sales:list' %}">Sales</a>
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm text-center" href="{% url 'inventory:items' %}">Inventory</a>
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm text-center" href="{% url 'customers:list' %}">Customers</a>
+          <a class="px-3 py-2 rounded-sm matyz-btn text-sm text-center col-span-2" href="{% url 'inventory:low_stock' %}">
+            Low Stock
+          </a>
+        </div>
+      </nav>
+
+    </div>
+  </header>
+
+  <!-- Global message/toast area (works with Django messages) -->
+  <div class="mx-auto max-w-6xl px-4 pt-4">
+    {% if messages %}
+      <div class="space-y-2">
+        {% for message in messages %}
+          <div class="matyz-surface rounded-sm px-4 py-3 text-sm">
+            <span class="font-semibold">{{ message.tags|title }}:</span>
+            <span class="matyz-muted">{{ message }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Main -->
+  <main class="mx-auto max-w-6xl px-4 py-6">
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <h1 class="text-lg md:text-xl font-semibold tracking-wide">{% block page_title %}{% endblock %}</h1>
+
+      <!-- HTMX loading indicator -->
+      <div class="htmx-indicator text-xs matyz-muted">
+        Loading…
+      </div>
+    </div>
+
+    <section class="matyz-surface rounded-sm p-4 md:p-6">
+      {% block content %}{% endblock %}
+    </section>
+  </main>
+
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+  <!-- Optional: htmx config -->
+  <script>
+    // Adds CSRF header automatically for htmx requests
+    document.body.addEventListener('htmx:configRequest', (event) => {
+      const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value;
+      if (csrfToken) event.detail.headers['X-CSRFToken'] = csrfToken;
+    });
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
