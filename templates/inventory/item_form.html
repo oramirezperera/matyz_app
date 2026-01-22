@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "create" %}New Item{% else %}Edit Item{% endif %} | Matyz Stock{% endblock %}
+{% block page_title %}{% if mode == "create" %}New Item{% else %}Edit Item{% endif %}{% endblock %}
+
+{% block content %}
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div class="matyz-surface rounded-sm p-3 text-sm">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="grid md:grid-cols-2 gap-4">
+      {% for field in form %}
+        <div class="{% if field.name == 'notes' %}md:col-span-2{% endif %}">
+          <label class="block text-xs matyz-muted mb-1">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}
+            <div class="text-xs mt-1" style="color: #e2d9bd;">{{ field.errors|striptags }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="flex gap-2">
+      <button type="submit" class="px-4 py-2 rounded-sm matyz-btn text-sm">Save</button>
+      {% if mode == "edit" %}
+        <a class="px-4 py-2 rounded-sm matyz-btn text-sm" href="{% url 'inventory:item_detail' item.pk %}">Cancel</a>
+      {% else %}
+        <a class="px-4 py-2 rounded-sm matyz-btn text-sm" href="{% url 'inventory:items' %}">Cancel</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <script>
+    // Make Django default widgets look decent without custom form widget styling
+    document.querySelectorAll("input, select, textarea").forEach(el => {
+      el.classList.add("w-full","px-3","py-2","rounded-sm","matyz-surface","outline-none");
+    });
+  </script>
+{% endblock %}

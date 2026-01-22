@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ item.name }} | Matyz Stock{% endblock %}
+{% block page_title %}Item{% endblock %}
+
+{% block content %}
+  <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <div>
+      <div class="text-xl font-semibold">{{ item.name }}</div>
+      <div class="text-sm matyz-muted">SKU: {{ item.sku }}{% if item.category %} • {{ item.category.name }}{% endif %}</div>
+      {% if item.brand or item.vendor %}
+        <div class="text-sm matyz-muted mt-1">
+          {% if item.brand %}Brand: {{ item.brand }}{% endif %}
+          {% if item.vendor %}{% if item.brand %} • {% endif %}Vendor: {{ item.vendor }}{% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="matyz-surface rounded-sm p-4 min-w-[220px]">
+      <div class="text-xs matyz-muted">Current stock</div>
+      <div class="text-3xl font-semibold">{{ current_stock }}</div>
+      <div class="text-xs matyz-muted mt-1">
+        Low stock threshold: {{ threshold }} {% if item.low_stock_threshold is None %}(default {{ default_threshold }}){% endif %}
+      </div>
+
+      <div class="mt-3 flex gap-2">
+        <a class="px-3 py-2 rounded-sm matyz-btn text-sm" href="{% url 'inventory:item_edit' item.pk %}">Edit</a>
+        <a class="px-3 py-2 rounded-sm matyz-btn text-sm" href="{% url 'inventory:movement_create' item.pk %}">+ Movement</a>
+      </div>
+    </div>
+  </div>
+
+  {% if item.notes %}
+    <div class="mt-4 matyz-muted text-sm whitespace-pre-line">{{ item.notes }}</div>
+  {% endif %}
+
+  <div class="mt-6">
+    <div class="text-sm font-semibold mb-2">Recent stock movements</div>
+
+    <div class="grid gap-2">
+      {% for m in movements %}
+        <div class="matyz-surface rounded-sm p-3 flex items-center justify-between gap-3">
+          <div>
+            <div class="text-sm">
+              <span class="font-semibold">{{ m.movement_type }}</span>
+              <span class="matyz-muted">• {{ m.created_at }}</span>
+            </div>
+            {% if m.note %}
+              <div class="text-xs matyz-muted">{{ m.note }}</div>
+            {% endif %}
+            {% if m.created_by %}
+              <div class="text-xs matyz-muted">By: {{ m.created_by.username }}</div>
+            {% endif %}
+          </div>
+
+          <div class="text-right">
+            <div class="text-lg font-semibold">
+              {% if m.quantity_change > 0 %}+{% endif %}{{ m.quantity_change }}
+            </div>
+            {% if m.sale_id %}
+              <div class="text-xs matyz-muted">Sale #{{ m.sale_id }}</div>
+            {% endif %}
+          </div>
+        </div>
+      {% empty %}
+        <div class="matyz-muted text-sm">No movements yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}

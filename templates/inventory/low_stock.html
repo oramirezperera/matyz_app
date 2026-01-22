@@ -1,8 +1,28 @@
 {% extends "base.html" %}
-
 {% block title %}Low Stock | Matyz Stock{% endblock %}
 {% block page_title %}Low Stock{% endblock %}
 
 {% block content %}
-  <p class="matyz-muted text-sm">Low stock placeholder. This will show alerts once Items + thresholds exist.</p>
+  <div class="text-sm matyz-muted mb-4">
+    Showing items with stock <= threshold (default threshold: {{ default_threshold }}).
+  </div>
+
+  <div class="grid gap-3">
+    {% for item, stock, threshold in rows %}
+      <a href="{% url 'inventory:item_detail' item.pk %}" class="matyz-surface rounded-sm p-4 block">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="font-semibold">{{ item.name }}</div>
+            <div class="text-xs matyz-muted">SKU: {{ item.sku }}{% if item.category %} • {{ item.category.name }}{% endif %}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-sm"><span class="matyz-muted">Stock:</span> <span class="font-semibold">{{ stock }}</span></div>
+            <div class="text-xs matyz-muted">Threshold: {{ threshold }}</div>
+          </div>
+        </div>
+      </a>
+    {% empty %}
+      <div class="matyz-muted text-sm">No low stock items 🎉</div>
+    {% endfor %}
+  </div>
 {% endblock %}

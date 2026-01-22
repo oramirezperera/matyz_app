@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}New Movement | Matyz Stock{% endblock %}
+{% block page_title %}New Stock Movement{% endblock %}
+
+{% block content %}
+  <div class="mb-3 text-sm matyz-muted">
+    Item: <span class="font-semibold">{{ item.name }}</span> ({{ item.sku }})
+  </div>
+
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+
+    <div class="grid md:grid-cols-2 gap-4">
+      {% for field in form %}
+        <div>
+          <label class="block text-xs matyz-muted mb-1">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}
+            <div class="text-xs matyz-muted mt-1">{{ field.help_text }}</div>
+          {% endif %}
+          {% if field.errors %}
+            <div class="text-xs mt-1">{{ field.errors|striptags }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="flex gap-2">
+      <button type="submit" class="px-4 py-2 rounded-sm matyz-btn text-sm">Save</button>
+      <a class="px-4 py-2 rounded-sm matyz-btn text-sm" href="{% url 'inventory:item_detail' item.pk %}">Cancel</a>
+    </div>
+  </form>
+
+  <script>
+    document.querySelectorAll("input, select, textarea").forEach(el => {
+      el.classList.add("w-full","px-3","py-2","rounded-sm","matyz-surface","outline-none");
+    });
+  </script>
+{% endblock %}
