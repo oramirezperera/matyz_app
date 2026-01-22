@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Matyz Stock{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="matyz-surface rounded-sm p-4">
+      <div class="text-xs matyz-muted">Low stock</div>
+      <div class="text-2xl font-semibold">—</div>
+    </div>
+    <div class="matyz-surface rounded-sm p-4">
+      <div class="text-xs matyz-muted">Sales today</div>
+      <div class="text-2xl font-semibold">—</div>
+    </div>
+    <div class="matyz-surface rounded-sm p-4">
+      <div class="text-xs matyz-muted">Outstanding debt</div>
+      <div class="text-2xl font-semibold">—</div>
+    </div>
+  </div>
+
+  <div class="mt-6 text-sm matyz-muted">
+    Next we’ll wire these with real queries once Sales + Stock Movements exist.
+  </div>
+{% endblock %}
