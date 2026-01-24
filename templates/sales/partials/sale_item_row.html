@@ -32,10 +32,3 @@
 
   {{ f.id }}
 </div>
-
-<script>
-  // ensure styling applies to new HTMX-inserted rows too
-  document.currentScript.parentElement.querySelectorAll("input, select, textarea").forEach(el => {
-    el.classList.add("w-full","px-3","py-2","rounded-sm","matyz-surface","outline-none");
-  });
-</script>

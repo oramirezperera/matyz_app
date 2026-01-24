@@ -1,9 +1,12 @@
 from decimal import Decimal
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.http import HttpResponse
+
+from collections import defaultdict
 
 from .forms import SaleForm, SaleItemFormSet, PaymentForm
 from .models import Sale, SaleItem
@@ -11,6 +14,8 @@ from .services import (
     compute_sale_totals,
     apply_sale_stock_movements_on_create,
     apply_sale_stock_movements_on_edit,
+    build_qty_by_item_from_formset,
+    validate_no_negative_stock
 )
 
 # Create your views here.
@@ -38,16 +43,24 @@ def sale_create(request):
     formset = SaleItemFormSet(request.POST or None, instance=sale)
 
     if request.method == "POST" and form.is_valid() and formset.is_valid():
-        sale = form.save()
-        formset.instance = sale
-        formset.save()
+        try:
+            with transaction.atomic():
+                sale = form.save()
+                formset.instance = sale
+                formset.save()
+                
+                # validate stock before applying movements
+                qty_by_item = build_qty_by_item_from_formset(formset)
+                validate_no_negative_stock(qty_by_item)
 
-        # totals + stock movements
-        compute_sale_totals(sale)
-        apply_sale_stock_movements_on_create(sale)
+                compute_sale_totals(sale)
+                apply_sale_stock_movements_on_create(sale)
 
-        messages.success(request, f"Sale #{sale.pk} created.")
-        return redirect("sales:detail", pk=sale.pk)
+            messages.success(request, f"Sale #{sale.pk} created.")
+            return redirect("sales:detail", pk=sale.pk)
+
+        except ValueError as e:
+            messages.error(request, str(e))
 
     return render(request, "sales/sale_form.html", {
         "mode": "create",
@@ -68,17 +81,36 @@ def sale_edit(request, pk: int):
     formset = SaleItemFormSet(request.POST or None, instance=sale)
 
     if request.method == "POST" and form.is_valid() and formset.is_valid():
-        sale = form.save()
-        formset.save()
+        try:
+            with transaction.atomic():
 
-        # recompute totals
-        compute_sale_totals(sale)
+                sale = form.save()
+                formset.save()
 
-        # reverse old stock and apply new stock
-        apply_sale_stock_movements_on_edit(sale, old_lines)
+                # Build extra availability from old lines (because we are about to reverse them)
+                old_qty_by_item = defaultdict(int)
+                for ol in old_lines:
+                    old_qty_by_item[ol["item_id"]] += int(ol["quantity"])
+                
+                # Validate against current stock + old quantities
+                qty_by_item = build_qty_by_item_from_formset(formset)
+                validate_no_negative_stock(qty_by_item, extra_available_by_item=old_qty_by_item)
 
-        messages.success(request, f"Sale #{sale.pk} updated.")
-        return redirect("sales:detail", pk=sale.pk)
+
+
+                # recompute totals
+                compute_sale_totals(sale)
+
+                # reverse old stock and apply new stock
+                apply_sale_stock_movements_on_edit(sale, old_lines)
+
+            messages.success(request, f"Sale #{sale.pk} updated.")
+            return redirect("sales:detail", pk=sale.pk)
+        
+        except ValueError as e:
+            messages.error(request, str(e))
+    
+    
 
     return render(request, "sales/sale_form.html", {
         "mode": "edit",
