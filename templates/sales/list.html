@@ -1,8 +1,44 @@
 {% extends "base.html" %}
-
 {% block title %}Sales | Matyz Stock{% endblock %}
 {% block page_title %}Sales{% endblock %}
 
 {% block content %}
-  <p class="matyz-muted text-sm">Sales module placeholder. Next we’ll build the real sales list + new sale flow.</p>
+  <div class="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+    <form method="get" class="flex-1 flex gap-2">
+      <input name="q" value="{{ q }}" placeholder="Search by customer or sale #"
+             class="w-full px-3 py-2 rounded-sm matyz-surface outline-none" />
+      <select name="status" class="px-3 py-2 rounded-sm matyz-surface outline-none">
+        <option value="">All</option>
+        <option value="PAID" {% if status == "PAID" %}selected{% endif %}>Paid</option>
+        <option value="PARTIAL" {% if status == "PARTIAL" %}selected{% endif %}>Partial</option>
+        <option value="UNPAID" {% if status == "UNPAID" %}selected{% endif %}>Unpaid</option>
+      </select>
+      <button class="px-4 py-2 rounded-sm matyz-btn text-sm" type="submit">Filter</button>
+    </form>
+
+    <a class="px-4 py-2 rounded-sm matyz-btn text-sm text-center" href="{% url 'sales:create' %}">
+      + New Sale
+    </a>
+  </div>
+
+  <div class="grid gap-3">
+    {% for s in sales %}
+      <a class="matyz-surface rounded-sm p-4 block hover:opacity-95" href="{% url 'sales:detail' s.pk %}">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="font-semibold">Sale #{{ s.pk }}</div>
+            <div class="text-xs matyz-muted">
+              {{ s.created_at }}{% if s.customer %} • {{ s.customer.name }}{% else %} • Walk-in{% endif %}
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-sm"><span class="matyz-muted">Total:</span> <span class="font-semibold">{{ s.total }}</span></div>
+            <div class="text-xs matyz-muted">Status: {{ s.status }}</div>
+          </div>
+        </div>
+      </a>
+    {% empty %}
+      <div class="matyz-muted text-sm">No sales yet.</div>
+    {% endfor %}
+  </div>
 {% endblock %}

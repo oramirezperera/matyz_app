@@ -1,0 +1,41 @@
+<div class="matyz-surface rounded-sm p-3" data-line>
+  {% if f.non_field_errors %}
+    <div class="text-sm mb-2">{{ f.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="grid md:grid-cols-4 gap-3 items-end">
+    <div class="md:col-span-2">
+      <label class="block text-xs matyz-muted mb-1">Item</label>
+      {{ f.item }}
+      {% if f.item.errors %}<div class="text-xs mt-1">{{ f.item.errors|striptags }}</div>{% endif %}
+    </div>
+
+    <div>
+      <label class="block text-xs matyz-muted mb-1">Qty</label>
+      {{ f.quantity }}
+      {% if f.quantity.errors %}<div class="text-xs mt-1">{{ f.quantity.errors|striptags }}</div>{% endif %}
+    </div>
+
+    <div>
+      <label class="block text-xs matyz-muted mb-1">Unit price</label>
+      {{ f.unit_price }}
+      {% if f.unit_price.errors %}<div class="text-xs mt-1">{{ f.unit_price.errors|striptags }}</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="mt-2 flex items-center justify-between">
+    <div class="text-xs matyz-muted">Mark to remove this line</div>
+    <div class="text-sm">
+      {{ f.DELETE }} <span class="matyz-muted text-xs">Remove</span>
+    </div>
+  </div>
+
+  {{ f.id }}
+</div>
+
+<script>
+  // ensure styling applies to new HTMX-inserted rows too
+  document.currentScript.parentElement.querySelectorAll("input, select, textarea").forEach(el => {
+    el.classList.add("w-full","px-3","py-2","rounded-sm","matyz-surface","outline-none");
+  });
+</script>

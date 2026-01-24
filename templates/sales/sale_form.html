@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "create" %}New Sale{% else %}Edit Sale{% endif %} | Matyz Stock{% endblock %}
+{% block page_title %}{% if mode == "create" %}New Sale{% else %}Edit Sale #{{ sale.pk }}{% endif %}{% endblock %}
+
+{% block content %}
+  <form method="post" class="space-y-5" id="saleForm">
+    {% csrf_token %}
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs matyz-muted mb-1">Customer</label>
+        {{ form.customer }}
+      </div>
+      <div>
+        <label class="block text-xs matyz-muted mb-1">Notes</label>
+        {{ form.notes }}
+      </div>
+    </div>
+
+    <div class="mt-2">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-sm font-semibold">Items</div>
+
+        <button
+          type="button"
+          class="px-3 py-2 rounded-sm matyz-btn text-sm"
+          hx-get="{% url 'sales:htmx_sale_item_row' %}"
+          hx-target="#saleItems"
+          hx-swap="beforeend"
+        >
+          + Add item
+        </button>
+      </div>
+
+      {{ formset.management_form }}
+
+      <div id="saleItems" class="grid gap-2">
+        {% for f in formset.forms %}
+          {% include "sales/partials/sale_item_row.html" with f=f %}
+        {% endfor %}
+      </div>
+
+      {% if formset.non_form_errors %}
+        <div class="mt-2 text-sm">{{ formset.non_form_errors }}</div>
+      {% endif %}
+    </div>
+
+    <div class="matyz-surface rounded-sm p-4 flex items-center justify-between">
+      <div class="text-sm matyz-muted">Subtotal preview</div>
+      <div class="text-xl font-semibold" id="subtotalPreview">0.00</div>
+    </div>
+
+    <div class="flex gap-2">
+      <button type="submit" class="px-4 py-2 rounded-sm matyz-btn text-sm">Save Sale</button>
+      <a class="px-4 py-2 rounded-sm matyz-btn text-sm" href="{% url 'sales:list' %}">Cancel</a>
+    </div>
+  </form>
+
+  <script>
+    // Style fields quickly
+    document.querySelectorAll("input, select, textarea").forEach(el => {
+      el.classList.add("w-full","px-3","py-2","rounded-sm","matyz-surface","outline-none");
+    });
+
+    // Live subtotal preview (client-side only; server remains source of truth)
+    function computeSubtotal() {
+      let sum = 0;
+      document.querySelectorAll("[data-line]").forEach(row => {
+        const qty = parseFloat(row.querySelector("input[name$='quantity']")?.value || 0);
+        const price = parseFloat(row.querySelector("input[name$='unit_price']")?.value || 0);
+        const del = row.querySelector("input[name$='DELETE']");
+        if (del && del.checked) return;
+        sum += qty * price;
+      });
+      document.getElementById("subtotalPreview").innerText = sum.toFixed(2);
+    }
+
+    document.getElementById("saleForm").addEventListener("input", computeSubtotal);
+    document.body.addEventListener("htmx:afterSwap", computeSubtotal);
+    computeSubtotal();
+  </script>
+{% endblock %}
