@@ -64,45 +64,54 @@
   </form>
 
     <script>
-        function styleFields(root=document) {
-            root.querySelectorAll("input, select, textarea").forEach(el => {
-            el.classList.add("w-full","px-3","py-2","rounded-sm","matyz-surface","outline-none");
-            });
-        }
+      const PRICE_MAP = JSON.parse('{{ price_map_json|escapejs }}');
+    </script>
 
-        function computeSubtotal() {
-            let sum = 0;
-            document.querySelectorAll("[data-line]").forEach(row => {
-            const qty = parseFloat(row.querySelector("input[name$='quantity']")?.value || 0);
-            const price = parseFloat(row.querySelector("input[name$='unit_price']")?.value || 0);
-            const del = row.querySelector("input[name$='DELETE']");
-            if (del && del.checked) return;
-            sum += qty * price;
-            });
-            document.getElementById("subtotalPreview").innerText = sum.toFixed(2);
-        }
+    <script>
+         // Style fields quickly
+  document.querySelectorAll("input, select, textarea").forEach(el => {
+    el.classList.add("w-full","px-3","py-2","rounded-sm","matyz-surface","outline-none");
+  });
 
-        (function () {
-            const prefix = "{{ formset.prefix }}"; // IMPORTANT: likely "items"
-            const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
-            const container = document.getElementById("saleItems");
-            const tpl = document.getElementById("empty-form-template"); // matches <template> id
+  // Live subtotal preview (client-side only; server remains source of truth)
+  function computeSubtotal() {
+    let sum = 0;
+    document.querySelectorAll("[data-line]").forEach(row => {
+      const qty = parseFloat(row.querySelector("input[name$='quantity']")?.value || 0);
+      const price = parseFloat(row.querySelector("input[name$='unit_price']")?.value || 0);
+      const del = row.querySelector("input[name$='DELETE']");
+      if (del && del.checked) return;
+      sum += qty * price;
+    });
+    document.getElementById("subtotalPreview").innerText = sum.toFixed(2);
+  }
 
-            document.getElementById("addLineBtn").addEventListener("click", () => {
-            const idx = Number(totalForms.value);
-            const html = tpl.innerHTML.replaceAll("__prefix__", idx);
-            container.insertAdjacentHTML("beforeend", html);
-            totalForms.value = idx + 1;
+  // ✅ NEW: auto-fill unit price when selecting an item
+  document.getElementById("saleItems").addEventListener("change", (e) => {
+    // Only react to the item dropdown
+    if (!e.target.matches("select")) return;
 
-            styleFields(container);
-            computeSubtotal();
-            });
+    const row = e.target.closest("[data-line]");
+    if (!row) return;
 
-            // initial setup
-            styleFields(document);
-            computeSubtotal();
-            document.getElementById("saleForm").addEventListener("input", computeSubtotal);
-        })();
+    const priceInput = row.querySelector("input[name$='unit_price']");
+    if (!priceInput) return;
+
+    const itemId = e.target.value;           // selected item id
+    const defaultPrice = PRICE_MAP[itemId];  // sell_price from inventory
+
+    // Only auto-fill if empty (so you can still override manually)
+    if ((priceInput.value || "").trim() === "" && defaultPrice !== undefined) {
+      priceInput.value = defaultPrice;
+      computeSubtotal();
+    }
+  });
+
+  // Recompute subtotal on any input changes in the form
+  document.getElementById("saleForm").addEventListener("input", computeSubtotal);
+
+  // Initial compute
+  computeSubtotal();
     </script>
 
 {% endblock %}

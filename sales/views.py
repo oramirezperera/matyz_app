@@ -6,6 +6,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.http import HttpResponse
 
+import json
+from inventory.models import Item
+
 from collections import defaultdict
 
 from .forms import SaleForm, SaleItemFormSet, PaymentForm
@@ -62,10 +65,16 @@ def sale_create(request):
         except ValueError as e:
             messages.error(request, str(e))
 
+    price_map_json=json.dumps({
+            str(i.id): str(i.sell_price)
+            for i in Item.objects.all().only("id", "sell_price")
+    })
+
     return render(request, "sales/sale_form.html", {
         "mode": "create",
         "form": form,
         "formset": formset,
+        "price_map_json": price_map_json,        
     })
 
 
@@ -110,13 +119,17 @@ def sale_edit(request, pk: int):
         except ValueError as e:
             messages.error(request, str(e))
     
-    
+    price_map_json=json.dumps({
+            str(i.id): str(i.sell_price)
+            for i in Item.objects.all().only("id", "sell_price")
+    })
 
     return render(request, "sales/sale_form.html", {
         "mode": "edit",
         "sale": sale,
         "form": form,
         "formset": formset,
+        "price_map_json": price_map_json,
     })
 
 

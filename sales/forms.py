@@ -16,6 +16,22 @@ class SaleItemForm(forms.ModelForm):
         model = SaleItem
         fields = ["item", "quantity", "unit_price"]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Allow leaving it empty filling it from item.sell_price
+        self.fields["unit_price"].required = False
+
+    def clean(self):
+        cleaned = super().clean()
+        item = cleaned.get("item")
+        unit_price = cleaned.get("unit_price")
+
+        #If unit price omitted, use the item's sell_price
+        if item and (unit_price is None or unit_price == ""):
+            cleaned["unit_price"] = item.sell_price
+        
+        return cleaned
+
     def clean_quantity(self):
         q = self.cleaned_data["quantity"]
         if q <= 0:
