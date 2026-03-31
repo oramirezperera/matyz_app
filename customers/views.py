@@ -57,7 +57,7 @@ def customer_detail(request, pk: int):
         .order_by("-created_at")
     )
 
-    total_spent = Sale.objects.filter(customer=customer).aggregate(s=Sum("Total"))["s"] or Decimal("0.00")
+    total_spent = Sale.objects.filter(customer=customer).aggregate(s=Sum("total"))["s"] or Decimal("0.00")
     total_paid = Payment.objects.filter(sale__customer=customer).aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
     outstanding = total_spent - total_paid
 
