@@ -1,10 +1,14 @@
 from decimal import Decimal
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.http import HttpResponse
+from datetime import datetime, time
+from django.utils.timezone import make_aware
+from customers.models import Customer
+
 
 import json
 from inventory.models import Item
@@ -12,7 +16,7 @@ from inventory.models import Item
 from collections import defaultdict
 
 from .forms import SaleForm, SaleItemFormSet, PaymentForm
-from .models import Sale, SaleItem
+from .models import Sale, SaleItem, Payment
 from .services import (
     compute_sale_totals,
     apply_sale_stock_movements_on_create,
@@ -23,21 +27,60 @@ from .services import (
 
 # Create your views here.
 def sales_list(request):
+   
     q = request.GET.get("q", "").strip()
     status = request.GET.get("status", "").strip()
+    customer_id = request.GET.get("customer", "").strip()
+    date_from = request.GET.get("from", "").strip()
+    date_to = request.GET.get("to", "").strip()
+    with_balance = request.GET.get("with_balance", "").strip()  # "1" means only unpaid/partial effectively
 
     sales = Sale.objects.select_related("customer").all()
 
     if status:
         sales = sales.filter(status=status)
 
-    if q:
-        sales = sales.filter(
-            Q(customer__name__icontains=q) |
-            Q(pk__icontains=q)
-        )
+    if customer_id:
+        sales = sales.filter(customer_id=customer_id)
 
-    return render(request, "sales/list.html", {"sales": sales, "q": q, "status": status})
+    if q:
+        # If q is numeric, allow searching by sale id
+        if q.isdigit():
+            sales = sales.filter(Q(pk=int(q)) | Q(customer__name__icontains=q))
+        else:
+            sales = sales.filter(customer__name__icontains=q)
+
+    # Date range (inclusive)
+    # Expect YYYY-MM-DD from input type="date"
+    try:
+        if date_from:
+            dt = make_aware(datetime.combine(datetime.strptime(date_from, "%Y-%m-%d").date(), time.min))
+            sales = sales.filter(created_at__gte=dt)
+        if date_to:
+            dt = make_aware(datetime.combine(datetime.strptime(date_to, "%Y-%m-%d").date(), time.max))
+            sales = sales.filter(created_at__lte=dt)
+    except ValueError:
+        # If user types invalid date, ignore filters rather than crash
+        pass
+
+    # Optional “with balance” filter: total - paid > 0
+    # We can’t do sale.balance directly in SQL because it’s a property,
+    # so we filter by statuses that imply balance, and we can also compute for display.
+    if with_balance == "1":
+        sales = sales.exclude(status=Sale.Status.PAID)
+
+    customers = Customer.objects.filter(is_active=True).order_by("name")
+
+    return render(request, "sales/list.html", {
+        "sales": sales,
+        "customers": customers,
+        "q": q,
+        "status": status,
+        "customer_id": customer_id,
+        "date_from": date_from,
+        "date_to": date_to,
+        "with_balance": with_balance,
+    })
 
 
 def sale_create(request):
@@ -174,3 +217,55 @@ def htmx_sale_item_row(request):
     # last form is the extra one
     html = render_to_string("sales/partials/sale_item_row.html", {"f": formset.forms[-1]})
     return HttpResponse(html)
+
+
+def debts_view(request):
+    # 1) Sales with debt (UNPAID or PARTIAL)
+    debt_sales = (
+        Sale.objects.select_related("customer")
+        .exclude(status=Sale.Status.PAID)
+        .order_by("-created_at")
+    )
+
+    # 2) Debt totals by customer (spent - paid)
+    # We compute in two queries to avoid join-multiplication.
+    spent_by_customer = dict(
+        Sale.objects.exclude(customer__isnull=True)
+        .values_list("customer_id")
+        .annotate(spent=Sum("total"))
+        .values_list("customer_id", "spent")
+    )
+
+    paid_by_customer = dict(
+        Payment.objects.exclude(sale__customer__isnull=True)
+        .values_list("sale__customer_id")
+        .annotate(paid=Sum("amount"))
+        .values_list("sale__customer_id", "paid")
+    )
+
+    # Build customer debt rows
+    customer_ids = set(spent_by_customer.keys()) | set(paid_by_customer.keys())
+    customers = Customer.objects.filter(id__in=customer_ids, is_active=True)
+
+    rows = []
+    for c in customers:
+        spent = spent_by_customer.get(c.id, Decimal("0.00")) or Decimal("0.00")
+        paid = paid_by_customer.get(c.id, Decimal("0.00")) or Decimal("0.00")
+        balance = spent - paid
+        if balance > 0:
+            rows.append({
+                "customer": c,
+                "spent": spent,
+                "paid": paid,
+                "balance": balance,
+            })
+
+    rows.sort(key=lambda r: r["balance"], reverse=True)
+
+    total_outstanding = sum((r["balance"] for r in rows), Decimal("0.00"))
+
+    return render(request, "sales/debts.html", {
+        "customer_rows": rows,
+        "debt_sales": debt_sales,
+        "total_outstanding": total_outstanding,
+    })

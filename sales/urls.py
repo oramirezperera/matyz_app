@@ -9,6 +9,7 @@ urlpatterns = [
     path("<int:pk>/", views.sale_detail, name="detail"),
     path("<int:pk>/edit/", views.sale_edit, name="edit"),
     path("<int:pk>/payment/", views.payment_create, name="payment_create"),
+    path("debts/", views.debts_view, name="debts"),
 
     # HTMX: add a new line item row
     path("htmx/sale-item-row/", views.htmx_sale_item_row, name="htmx_sale_item_row"),

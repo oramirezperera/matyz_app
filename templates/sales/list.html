@@ -3,23 +3,48 @@
 {% block page_title %}Sales{% endblock %}
 
 {% block content %}
-  <div class="flex flex-col md:flex-row md:items-center gap-3 mb-4">
-    <form method="get" class="flex-1 flex gap-2">
-      <input name="q" value="{{ q }}" placeholder="Search by customer or sale #"
-             class="w-full px-3 py-2 rounded-sm matyz-surface outline-none" />
-      <select name="status" class="px-3 py-2 rounded-sm matyz-surface outline-none">
-        <option value="">All</option>
-        <option value="PAID" {% if status == "PAID" %}selected{% endif %}>Paid</option>
-        <option value="PARTIAL" {% if status == "PARTIAL" %}selected{% endif %}>Partial</option>
-        <option value="UNPAID" {% if status == "UNPAID" %}selected{% endif %}>Unpaid</option>
-      </select>
-      <button class="px-4 py-2 rounded-sm matyz-btn text-sm" type="submit">Filter</button>
-    </form>
+<form method="get" class="grid md:grid-cols-5 gap-2 mb-4">
+  <input
+    name="q"
+    value="{{ q }}"
+    placeholder="Sale # or customer"
+    class="px-3 py-2 rounded-sm matyz-surface outline-none"
+  />
 
-    <a class="px-4 py-2 rounded-sm matyz-btn text-sm text-center" href="{% url 'sales:create' %}">
-      + New Sale
-    </a>
+  <select name="status" class="px-3 py-2 rounded-sm matyz-surface outline-none">
+    <option value="">All statuses</option>
+    <option value="PAID" {% if status == "PAID" %}selected{% endif %}>Paid</option>
+    <option value="PARTIAL" {% if status == "PARTIAL" %}selected{% endif %}>Partial</option>
+    <option value="UNPAID" {% if status == "UNPAID" %}selected{% endif %}>Unpaid</option>
+  </select>
+
+  <select name="customer" class="px-3 py-2 rounded-sm matyz-surface outline-none">
+    <option value="">All customers</option>
+    {% for c in customers %}
+      <option value="{{ c.id }}" {% if customer_id|add:"" == c.id|add:"" %}selected{% endif %}>
+        {{ c.name }}
+      </option>
+    {% endfor %}
+  </select>
+
+  <input type="date" name="from" value="{{ date_from }}" class="px-3 py-2 rounded-sm matyz-surface outline-none" />
+  <input type="date" name="to" value="{{ date_to }}" class="px-3 py-2 rounded-sm matyz-surface outline-none" />
+
+  <label class="md:col-span-3 flex items-center gap-2 text-sm matyz-muted">
+    <input type="checkbox" name="with_balance" value="1" {% if with_balance == "1" %}checked{% endif %} />
+    Only with outstanding balance
+  </label>
+
+  <div class="md:col-span-2 flex gap-2 justify-end">
+    <button class="px-4 py-2 rounded-sm matyz-btn text-sm" type="submit">Apply</button>
+    <a class="px-4 py-2 rounded-sm matyz-btn text-sm" href="{% url 'sales:list' %}">Reset</a>
   </div>
+</form>
+
+<div class="flex gap-2 mb-4">
+  <a class="px-4 py-2 rounded-sm matyz-btn text-sm" href="{% url 'sales:create' %}">+ New Sale</a>
+  <a class="px-4 py-2 rounded-sm matyz-btn text-sm" href="{% url 'sales:debts' %}">View Debts</a>
+</div>
 
   <div class="grid gap-3">
     {% for s in sales %}
