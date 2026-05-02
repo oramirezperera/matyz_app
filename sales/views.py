@@ -8,6 +8,9 @@ from django.http import HttpResponse
 from datetime import datetime, time
 from django.utils.timezone import make_aware
 from customers.models import Customer
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from core.permissions import is_manager
 
 
 import json
@@ -16,7 +19,7 @@ from inventory.models import Item
 from collections import defaultdict
 
 from .forms import SaleForm, SaleItemFormSet, PaymentForm
-from .models import Sale, SaleItem, Payment
+from .models import Sale, SaleItem, Payment, SaleAuditLog
 from .services import (
     compute_sale_totals,
     apply_sale_stock_movements_on_create,
@@ -26,6 +29,7 @@ from .services import (
 )
 
 # Create your views here.
+@login_required
 def sales_list(request):
    
     q = request.GET.get("q", "").strip()
@@ -83,6 +87,7 @@ def sales_list(request):
     })
 
 
+@login_required
 def sale_create(request):
     sale = Sale()
     form = SaleForm(request.POST or None, instance=sale)
@@ -121,13 +126,19 @@ def sale_create(request):
     })
 
 
+@login_required
 def sale_edit(request, pk: int):
-    sale = get_object_or_404(Sale, pk=pk)
 
-    # Capture old lines BEFORE any changes, so we can reverse stock
-    old_lines = list(
-        sale.items.values("item_id", "quantity")
-    )
+    sale = get_object_or_404(Sale, pk=pk)
+    has_payments = sale.payments.exists()
+
+    # If it has payments, only Managers/Admins can edit
+    if has_payments and not is_manager(request.user):
+        raise PermissionDenied("Only Managers can edit sales that already have payments.")
+
+    # Capture old lines + old totals BEFORE changes
+    old_lines = list(sale.items.values("item_id", "quantity"))
+    old_total = sale.total
 
     form = SaleForm(request.POST or None, instance=sale)
     formset = SaleItemFormSet(request.POST or None, instance=sale)
@@ -135,61 +146,77 @@ def sale_edit(request, pk: int):
     if request.method == "POST" and form.is_valid() and formset.is_valid():
         try:
             with transaction.atomic():
-
                 sale = form.save()
                 formset.save()
 
-                # Build extra availability from old lines (because we are about to reverse them)
+                # Validate stock (your existing no-negative-stock logic)
                 old_qty_by_item = defaultdict(int)
                 for ol in old_lines:
                     old_qty_by_item[ol["item_id"]] += int(ol["quantity"])
-                
-                # Validate against current stock + old quantities
+
                 qty_by_item = build_qty_by_item_from_formset(formset)
                 validate_no_negative_stock(qty_by_item, extra_available_by_item=old_qty_by_item)
 
-
-
-                # recompute totals
+                # Totals + stock movements
                 compute_sale_totals(sale)
-
-                # reverse old stock and apply new stock
                 apply_sale_stock_movements_on_edit(sale, old_lines)
+
+                # ✅ Audit log if sale had payments OR if manager edited (we log only when payments exist)
+                if has_payments:
+                    SaleAuditLog.objects.create(
+                        sale=sale,
+                        actor=request.user,
+                        had_payments=True,
+                        old_total=old_total,
+                        new_total=sale.total,
+                        note=(
+                            "Sale edited after payments existed.\n"
+                            f"Old total: {old_total}\n"
+                            f"New total: {sale.total}"
+                        ),
+                    )
 
             messages.success(request, f"Sale #{sale.pk} updated.")
             return redirect("sales:detail", pk=sale.pk)
-        
+
         except ValueError as e:
             messages.error(request, str(e))
-    
-    price_map_json=json.dumps({
-            str(i.id): str(i.sell_price)
-            for i in Item.objects.all().only("id", "sell_price")
-    })
+
+    # ✅ show warning banner on GET if payments exist
+    if has_payments:
+        messages.warning(
+            request,
+            "Warning: this sale already has payments. Editing it changes accounting history. "
+            "An audit record will be created."
+        )
 
     return render(request, "sales/sale_form.html", {
         "mode": "edit",
         "sale": sale,
         "form": form,
         "formset": formset,
-        "price_map_json": price_map_json,
+        "has_payments": has_payments,
     })
 
 
+@login_required
 def sale_detail(request, pk: int):
     sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
     items = sale.items.select_related("item").all()
     payments = sale.payments.all()
     payment_form = PaymentForm()
+    audit_logs = sale.audit_logs.select_related("actor").all()[:20]
 
     return render(request, "sales/detail.html", {
         "sale": sale,
         "items": items,
         "payments": payments,
         "payment_form": payment_form,
+        "audit_logs": audit_logs,
     })
 
 
+@login_required
 def payment_create(request, pk: int):
     sale = get_object_or_404(Sale, pk=pk)
     form = PaymentForm(request.POST or None)
@@ -206,6 +233,7 @@ def payment_create(request, pk: int):
     return redirect("sales:detail", pk=sale.pk)
 
 
+@login_required
 def htmx_sale_item_row(request):
     """
     Returns an extra empty form row for the SaleItem formset.
@@ -219,6 +247,7 @@ def htmx_sale_item_row(request):
     return HttpResponse(html)
 
 
+@login_required
 def debts_view(request):
     # 1) Sales with debt (UNPAID or PARTIAL)
     debt_sales = (

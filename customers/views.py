@@ -2,12 +2,14 @@ from decimal import Decimal
 from django.contrib import messages
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib.auth.decorators import login_required
 
 from .forms import CustomerForm
 from .models import Customer
 from sales.models import Sale, Payment
 
 # Create your views here.
+@login_required
 def customers_list(request):
     q = request.GET.get("q", "").strip()
 
@@ -29,6 +31,7 @@ def customers_list(request):
     })
 
 
+@login_required
 def customer_create(request):
     form = CustomerForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -38,6 +41,7 @@ def customer_create(request):
     return render(request, "customers/form.html", {"form": form, "mode":"create"})
 
 
+@login_required
 def customer_edit(request, pk: int):
     customer = get_object_or_404(Customer, pk=pk)
     form = CustomerForm(request.POST or None, instance=customer)
@@ -48,6 +52,7 @@ def customer_edit(request, pk: int):
     return render(request, "customers/form.html", {"form": form, "mode":"edit", "customer":customer})
 
 
+@login_required
 def customer_detail(request, pk: int):
     customer = get_object_or_404(Customer, pk=pk)
 

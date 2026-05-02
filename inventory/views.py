@@ -3,6 +3,9 @@ from django.contrib import messages
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from core.permissions import is_manager
 
 from .forms import ItemForm, StockMovementForm
 from .models import Item, StockMovement
@@ -11,6 +14,7 @@ from .models import Item, StockMovement
 DEFAULT_LOW_STOCK = 5  # Later: make this configurable in a Settings table
 
 
+@login_required
 def items_list(request):
     q = request.GET.get("q", "").strip()
     only_active = request.GET.get("active", "1")  # default active only
@@ -44,6 +48,7 @@ def items_list(request):
     })
 
 
+@login_required
 def item_create(request):
     form = ItemForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -53,6 +58,7 @@ def item_create(request):
     return render(request, "inventory/item_form.html", {"form": form, "mode": "create"})
 
 
+@login_required
 def item_edit(request, pk: int):
     item = get_object_or_404(Item, pk=pk)
     form = ItemForm(request.POST or None, instance=item)
@@ -63,6 +69,7 @@ def item_edit(request, pk: int):
     return render(request, "inventory/item_form.html", {"form": form, "mode": "edit", "item": item})
 
 
+@login_required
 def item_detail(request, pk: int):
     item = get_object_or_404(Item.objects.select_related("category"), pk=pk)
     movements = item.movements.select_related("created_by").all()[:50]
@@ -78,7 +85,11 @@ def item_detail(request, pk: int):
     })
 
 
+@login_required
 def movement_create(request, pk: int):
+    if not is_manager(request.user):
+        raise PermissionDenied("Only managers can record stock movements.")
+    
     item = get_object_or_404(Item, pk=pk)
 
     form = StockMovementForm(request.POST or None)
@@ -96,6 +107,7 @@ def movement_create(request, pk: int):
     })
 
 
+@login_required
 def low_stock(request):
     # We need aggregated stock in one query
     items = (

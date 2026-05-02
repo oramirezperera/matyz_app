@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
+from django.conf import settings
 
 # Create your models here.
 class Sale(models.Model):
@@ -95,3 +96,23 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.amount} for Sale #{self.sale_id}"
+    
+
+class SaleAuditLog(models.Model):
+    sale = models.ForeignKey("sales.Sale", on_delete=models.CASCADE, related_name="audit_logs")
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+
+    created_at = models.DateTimeField(default=timezone.now)
+
+    had_payments = models.BooleanField(default=False)
+
+    old_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    new_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    note = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Audit Sale #{self.sale_id} @ {self.created_at}"
